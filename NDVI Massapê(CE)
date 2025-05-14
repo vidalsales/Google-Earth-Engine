@@ -1,1 +1,41 @@
+// 1. Definir a geometria (Massapê - CE)
+var massape = ee.Geometry.Point([-40.3426, -3.5232]).buffer(7000);
 
+// raio de 7km
+
+Map.centerObject(massape, 11);
+Map.addLayer(massape, {}, 'Massapê');
+
+// 2. Selecionar imagem Sentinel-2 SR
+var sentinel = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+  .select(['B.*'])
+  .filterBounds(massape)
+  .filterDate('2024-01-01', '2024-12-31')
+  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10))
+  .sort('CLOUDY_PIXEL_PERCENTAGE')
+  .first()
+  
+// Nome e % de nuvem
+print('nome',sentinel.get('PRODUCT_ID'))
+print('& nuvem',sentinel.get('CLOUDY_PIXEL_PERCENTAGE'))
+
+//Fator escala
+var image = sentinel.multiply(0.0001)
+
+// 3. Calcular o NDVI = (NIR - RED) / (NIR + RED)
+var ndvi = image.normalizedDifference(['B8','B4']).rename('NDVI')
+
+
+//visualizar os dados
+Map.addLayer(image, {bands:['B4','B3','B2'],min:0.027, max:0.2369},'Sentinel RGB')
+Map.addLayer(image, {bands:['B6','B5','B3'],min:0.0194, max:0.3957},'Sentinel Falsa Cor')
+Map.addLayer(ndvi, {palette:['red','yellow','green'],min:-0.065, max:0.77},'NDVI')
+
+// 6. Estatísticas básicas (opcional)
+var estatisticas = ndvi.reduceRegion({
+  reducer: ee.Reducer.mean(),
+  geometry: massape,
+  scale: 10,
+  maxPixels: 1e9
+});
+print('Média de NDVI:', estatisticas);
